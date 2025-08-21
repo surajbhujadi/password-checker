@@ -26,7 +26,7 @@ It helps users create strong and secure passwords with instant feedback.
 
 ## 📸 Demo
 Visit the live project:  
-[https://your-username.github.io/strong-password-checker/](https://your-username.github.io/strong-password-checker/)
+https://surajbhujadi.github.io/password-checker/
 
 ---
 
