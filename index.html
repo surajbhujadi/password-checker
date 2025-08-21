@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cyber Password Strength Checker</title>
+  <style>
+    /* ===== CYBER THEME ===== */
+    :root{
+      --bg1:#0f2027;--bg2:#203a43;--bg3:#2c5364;--neon:#00ffea;--neon2:#7df9ff;--danger:#ff4d4f;--warn:#ffc107;--ok:#00e676;--text:#d9ffff;
+      --card:#000000dd;--muted:#8fd6d6;--border:#00ffea;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 20% 10%, var(--bg1), var(--bg2), var(--bg3));
+      color:var(--text);font-family:"JetBrains Mono","Courier New",monospace;
+    }
+    .wrap{width:min(960px,95vw);display:grid;gap:16px}
+    .brand{display:flex;gap:12px;align-items:center;justify-content:center}
+    .logo{width:42px;height:42px;border:1px solid var(--border);border-radius:10px;
+      box-shadow:0 0 10px var(--neon),0 0 20px #007bff inset;display:grid;place-items:center}
+    .title{font-size:20px;text-shadow:0 0 10px var(--neon)}
+
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;
+      box-shadow:0 0 12px var(--neon),0 0 30px #007bff40}
+
+    .grid{display:grid;gap:16px}
+    @media(min-width:840px){.grid{grid-template-columns:1.1fr .9fr}}
+
+    label{font-size:14px;color:var(--muted)}
+    input[type="password"],input[type="text"],input[type="email"],input[type="date"],input[type="number"],select{
+      width:100%;padding:12px 14px;margin-top:6px;border-radius:10px;background:#000;border:1px solid var(--border);
+      color:var(--neon);outline:none;box-shadow:inset 0 0 8px var(--neon)}
+    .row{display:grid;gap:12px}
+    @media(min-width:560px){.row{grid-template-columns:1fr 1fr}}
+
+    .meter{height:14px;border-radius:999px;background:#022;overflow:hidden;border:1px solid var(--border)}
+    .bar{height:100%;width:0%;transition:width .3s ease}
+    .bar.weak{background:linear-gradient(90deg,var(--danger),#ff7675)}
+    .bar.med{background:linear-gradient(90deg,var(--warn),#ffd54f)}
+    .bar.strong{background:linear-gradient(90deg,var(--ok),#6effa1)}
+
+    .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .badge{border:1px dashed var(--border);padding:4px 8px;border-radius:999px;font-size:12px;color:var(--neon)}
+
+    ul.tips{margin:10px 0 0 18px}
+    ul.tips li{margin:6px 0}
+
+    .switches{display:flex;gap:10px;flex-wrap:wrap}
+    .switch{display:flex;gap:8px;align-items:center;font-size:13px}
+
+    button{cursor:pointer;border:none;border-radius:10px;padding:10px 14px;
+      background:#001a1a;color:var(--neon);border:1px solid var(--border);
+      box-shadow:0 0 10px var(--neon) inset,0 0 10px var(--neon);}
+    button:active{transform:translateY(1px)}
+    .small{font-size:12px;color:var(--muted)}
+
+    .i18n{display:flex;gap:8px;justify-content:flex-end}
+    .aria-live{position:absolute;left:-9999px}
+    a.link{color:var(--neon2)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo">🔐</div>
+      <div class="title">Cyber Password Strength Checker · Realtime · Privacy-first</div>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT: Checker -->
+      <section class="card" aria-labelledby="checkerTitle">
+        <h2 id="checkerTitle">🔎 <span data-i18n="checker_title">Check your password</span></h2>
+        <div class="row">
+          <div class="col">
+            <label for="pwd" data-i18n="password">Password</label>
+            <input id="pwd" type="password" autocomplete="new-password" aria-describedby="help"
+                   placeholder="••••••••••" />
+            <div id="help" class="small" data-i18n="privacy_note">Processed locally in your browser. Passwords are not logged.</div>
+          </div>
+          <div class="col">
+            <label for="policyPreset">Policy</label>
+            <select id="policyPreset">
+              <option value="default">Default (min 12)</option>
+              <option value="strict">Strict (min 14, all classes)</option>
+              <option value="passphrase">Passphrase (min 3 words)</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" id="customPolicy" style="display:none">
+          <div>
+            <label>Min length</label>
+            <input type="number" id="minLen" value="12" min="4" max="64" />
+          </div>
+          <div class="switches">
+            <label class="switch"><input type="checkbox" id="reqUpper" checked/> <span>Upper</span></label>
+            <label class="switch"><input type="checkbox" id="reqLower" checked/> <span>Lower</span></label>
+            <label class="switch"><input type="checkbox" id="reqDigit" checked/> <span>Digit</span></label>
+            <label class="switch"><input type="checkbox" id="reqSymbol" checked/> <span>Symbol</span></label>
+          </div>
+        </div>
+
+        <div class="meter" aria-hidden="true"><div class="bar" id="bar"></div></div>
+        <div class="badges" id="badges"></div>
+        <p class="small"><span id="labelStrength">Strength:</span> <b id="strength">—</b> · <span id="entropy">0</span> bits · <span id="crack">—</span></p>
+        <ul class="tips" id="tips"></ul>
+        <div class="switches" style="margin-top:8px">
+          <label class="switch"><input type="checkbox" id="hibpOpt"/> <span>HIBP breach check (privacy-preserving)</span></label>
+          <span class="small">Uses k‑anonymity; only first 5 SHA‑1 chars sent.</span>
+        </div>
+        <div id="hibpResult" class="small"></div>
+
+        <div class="i18n">
+          <button id="langEn">English</button>
+          <button id="langMr">मराठी</button>
+        </div>
+        <div class="aria-live" aria-live="polite" id="live"></div>
+      </section>
+
+      <!-- RIGHT: User info + Generator + Explain -->
+      <section class="card">
+        <h2>🧩 <span data-i18n="pi_title">Avoid personal info</span></h2>
+        <div class="row">
+          <div>
+            <label data-i18n="name">Name</label>
+            <input type="text" id="piName" placeholder="e.g., Suraj" />
+          </div>
+          <div>
+            <label>Email</label>
+            <input type="email" id="piEmail" placeholder="you@example.com" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label data-i18n="username">Username</label>
+            <input type="text" id="piUser" placeholder="handle" />
+          </div>
+          <div>
+            <label data-i18n="dob">Date of Birth</label>
+            <input type="date" id="piDob" />
+          </div>
+        </div>
+        <p class="small" data-i18n="pi_note">We only compare substrings locally. Nothing is uploaded.</p>
+
+        <hr style="border:0;border-top:1px dashed var(--border);margin:12px 0">
+        <h2>⚙️ <span data-i18n="gen_title">Password / Passphrase Generator</span></h2>
+        <div class="switches">
+          <button id="genStrong">Generate Strong Password</button>
+          <button id="genPhrase">Generate Passphrase</button>
+          <button id="copyBtn">Copy</button>
+        </div>
+        <input type="text" id="genOut" readonly placeholder="Generated will appear here" />
+        <p class="small" data-i18n="clip_note">Clipboard auto‑clears after 20s.</p>
+
+        <hr style="border:0;border-top:1px dashed var(--border);margin:12px 0">
+        <h2>ℹ️ <span data-i18n="explain_title">Why we rated it so</span></h2>
+        <div id="explain" class="small"></div>
+      </section>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>Security & Privacy Notes</summary>
+        <ul>
+          <li>No passwords are stored or sent anywhere. HIBP check is opt‑in and uses k‑anonymity.</li>
+          <li>All checks run client-side first. If you later add a server, duplicate validation there.</li>
+          <li>If comparing previous passwords, hash with a strong KDF (Argon2id / scrypt / PBKDF2).</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+
+  <script>
+    // ====== I18N (English + Marathi minimal strings) ======
+    const I18N = {
+      en:{
+        checker_title:"Check your password", privacy_note:"Processed locally in your browser. Passwords are not logged.",
+        pi_title:"Avoid personal info", name:"Name", username:"Username", dob:"Date of Birth", pi_note:"We only compare substrings locally. Nothing is uploaded.",
+        gen_title:"Password / Passphrase Generator", clip_note:"Clipboard auto‑clears after 20s.", explain_title:"Why we rated it so"
+      },
+      mr:{
+        checker_title:"पासवर्ड तपासा", privacy_note:"सर्व तपासणी ब्राउझरमध्ये; पासवर्ड लॉग होत नाही.",
+        pi_title:"वैयक्तिक माहिती टाळा", name:"नाव", username:"युजरनेम", dob:"जन्मतारीख", pi_note:"फक्त स्थानिक जुळवणी; काहीही अपलोड होत नाही.",
+        gen_title:"पासवर्ड/पासफ्रेज जनरेट करा", clip_note:"क्लिपबोर्ड २० सेकंदांनी रिकामे होईल.", explain_title:"गुणांकन का असे आले"
+      }
+    }
+    let currentLang = 'en';
+    function applyI18n(){
+      document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent = I18N[currentLang][el.dataset.i18n] || el.textContent});
+    }
+    document.getElementById('langEn').onclick=()=>{currentLang='en';applyI18n()}
+    document.getElementById('langMr').onclick=()=>{currentLang='mr';applyI18n()}
+    applyI18n();
+
+    // ====== Policy Engine ======
+    const policy = {
+      minLen:12, reqUpper:true, reqLower:true, reqDigit:true, reqSymbol:true, passphrase:false
+    };
+    const presetEl = document.getElementById('policyPreset');
+    const customDiv = document.getElementById('customPolicy');
+    presetEl.addEventListener('change',()=>{
+      const v=presetEl.value;
+      customDiv.style.display = v==='custom'?'grid':'none';
+      if(v==='default'){Object.assign(policy,{minLen:12,reqUpper:true,reqLower:true,reqDigit:true,reqSymbol:true,passphrase:false});}
+      if(v==='strict'){Object.assign(policy,{minLen:14,reqUpper:true,reqLower:true,reqDigit:true,reqSymbol:true,passphrase:false});}
+      if(v==='passphrase'){Object.assign(policy,{minLen:3,reqUpper:false,reqLower:false,reqDigit:false,reqSymbol:false,passphrase:true});}
+      if(v==='custom'){
+        document.getElementById('minLen').value=policy.minLen;
+        document.getElementById('reqUpper').checked=policy.reqUpper;
+        document.getElementById('reqLower').checked=policy.reqLower;
+        document.getElementById('reqDigit').checked=policy.reqDigit;
+        document.getElementById('reqSymbol').checked=policy.reqSymbol;
+      }
+      evaluate();
+    });
+    ['minLen','reqUpper','reqLower','reqDigit','reqSymbol'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el)return; el.addEventListener('input',()=>{
+        if(id==='minLen') policy.minLen = parseInt(el.value||'12',10);
+        else policy[id]=el.checked; evaluate();
+      });
+    });
+
+    // ====== Utilities ======
+    const upper=/[A-Z]/, lower=/[a-z]/, digit=/\d/, symbol=/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/;
+    const keyboardSeq=["qwerty","asdfgh","zxcvbn","1234567890","poiuy","lkjhg","mnbvc"];
+    const commonWords=["password","admin","welcome","dragon","football","iloveyou","monkey","letmein","qwerty","india","suraj","pune","dy","patil","google","linkedin","github","cricket","mumbai","spring","summer","winter","august","january"];
+
+    function hasSequence(str,min=4){
+      const s=str.toLowerCase();
+      // alphabetic or numeric sequences
+      for(let i=0;i<=s.length-min;i++){
+        let inc=true, dec=true;
+        for(let j=0;j<min-1;j++){
+          if(s.charCodeAt(i+j)+1!==s.charCodeAt(i+j+1)) inc=false;
+          if(s.charCodeAt(i+j)-1!==s.charCodeAt(i+j+1)) dec=false;
+          if(!inc && !dec) break;
+        }
+        if(inc||dec) return true;
+      }
+      // keyboard sequences
+      return keyboardSeq.some(seq=>s.includes(seq));
+    }
+    function hasRepetition(str){
+      if(/(.)\1{3,}/.test(str)) return true; // same char 4+
+      // repeated chunks like abcabc
+      return /(\w{2,})\1{1,}/i.test(str);
+    }
+    function containsPersonal(str){
+      const s=str.toLowerCase();
+      const bag=[];
+      const name=(document.getElementById('piName').value||'').toLowerCase();
+      const email=(document.getElementById('piEmail').value||'').toLowerCase();
+      const user=(document.getElementById('piUser').value||'').toLowerCase();
+      const dob=(document.getElementById('piDob').value||'');
+      [name,user,email.split('@')[0]||''].forEach(v=>{if(v&&v.length>=3) bag.push(v)});
+      if(dob){bag.push(dob.replace(/-/g,'')); bag.push(dob.slice(2,4)); bag.push(dob.slice(0,4));}
+      return bag.some(token=>token && token.length>=3 && s.includes(token));
+    }
+
+    function characterSpace(pwd){
+      let space=0; if(upper.test(pwd)) space+=26; if(lower.test(pwd)) space+=26; if(digit.test(pwd)) space+=10; if(symbol.test(pwd)) space+=33; return space||1;
+    }
+    function estimateEntropy(pwd){
+      const R=characterSpace(pwd); const H = Math.log2(R) * pwd.length; return Math.round(H);
+    }
+    function estimateCrackTime(entropyBits, mode='offline'){
+      // crude estimates: offline fast hash 1e10 guesses/sec, online 100/sec
+      const rates={offline:1e10, online:100};
+      const guesses=Math.pow(2, entropyBits);
+      const seconds=guesses / (rates[mode]||1e6);
+      return humanTime(seconds);
+    }
+    function humanTime(sec){
+      if(sec<1) return '<1s';
+      const units=[[31557600,'y'],[2629800,'mo'],[604800,'w'],[86400,'d'],[3600,'h'],[60,'m'],[1,'s']];
+      let s=sec; const parts=[]; for(const [u,label] of units){
+        const v=Math.floor(s/u); if(v>0){parts.push(v+label); s-=v*u;} if(parts.length>=2) break;
+      } return parts.join(' ');
+    }
+
+    async function sha1Hex(msg){
+      const enc=new TextEncoder().encode(msg);
+      const buf=await crypto.subtle.digest('SHA-1', enc);
+      const view=new DataView(buf); let hex=''; for(let i=0;i<view.byteLength;i++){const b=view.getUint8(i).toString(16).padStart(2,'0'); hex+=b}
+      return hex.toUpperCase();
+    }
+
+    async function hibpCheck(pwd){
+      try{
+        const hash=await sha1Hex(pwd); const prefix=hash.slice(0,5); const suffix=hash.slice(5);
+        const res=await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+        if(!res.ok) return {ok:false};
+        const text=await res.text();
+        const lines=text.split('\n');
+        for(const line of lines){
+          const [s,count]=line.trim().split(':');
+          if(s===suffix) return {ok:true, count:parseInt(count,10)};
+        }
+        return {ok:true, count:0};
+      }catch(e){return {ok:false, error:e.message}}
+    }
+
+    // ====== Scoring ======
+    function scorePassword(pwd){
+      const badges=[]; const tips=[]; let score=0; let explain=[];
+      const len=pwd.length; const cls={U:upper.test(pwd), L:lower.test(pwd), D:digit.test(pwd), S:symbol.test(pwd)};
+      // length
+      if(len>=policy.minLen) {score+=20; badges.push(`Len ${len}`)} else {tips.push(`Increase length to ≥ ${policy.minLen}.`)}
+      // classes
+      const classCount=Object.values(cls).filter(Boolean).length;
+      score += classCount*10; if(classCount<4) tips.push('Add more character types (upper/lower/digit/symbol).');
+      if(policy.reqUpper && !cls.U) tips.push('Add an uppercase letter.');
+      if(policy.reqLower && !cls.L) tips.push('Add a lowercase letter.');
+      if(policy.reqDigit && !cls.D) tips.push('Add a digit.');
+      if(policy.reqSymbol && !cls.S) tips.push('Add a symbol.');
+
+      // penalties
+      if(hasSequence(pwd)) {score-=20; tips.push('Avoid sequences like abcde, 12345, qwerty.'); badges.push('Sequence detected')}
+      if(hasRepetition(pwd)) {score-=15; tips.push('Avoid repeated patterns like aaaaa or abcabc.'); badges.push('Repetition')}
+      const lowerPwd=pwd.toLowerCase();
+      if(commonWords.some(w=>lowerPwd.includes(w))) {score-=15; tips.push('Avoid common words / months / teams.'); badges.push('Common word')}
+      if(containsPersonal(pwd)) {score-=25; tips.push('Remove personal info (name/email/DoB/username).'); badges.push('Personal info match')}
+
+      // entropy & crack time
+      const H=estimateEntropy(pwd);
+      let baseLabel='Weak'; let pct=20; let barClass='weak';
+      if(score>=60 && H>=60){baseLabel='Medium'; pct=60; barClass='med'}
+      if(score>=85 && H>=75){baseLabel='Strong'; pct=90; barClass='strong'}
+      // normalize score 0..100
+      score=Math.max(0, Math.min(100, score + Math.max(0, H-40)));
+      pct = Math.max(5, Math.min(100, score));
+
+      explain.push(`Length: ${len} (policy ≥${policy.minLen})`);
+      explain.push(`Classes: ${['U','L','D','S'].filter(k=>cls[{U:'U',L:'L',D:'D',S:'S'}[k]]).join('')||'none'}`);
+      explain.push(`Entropy≈ ${H} bits`);
+
+      return {score, pct, label:baseLabel, entropy:H, tips, badges, explain};
+    }
+
+    // ====== Generator ======
+    function randInt(n){return Math.floor(Math.random()*n)}
+    const smallWords=["alpha","bravo","charlie","delta","echo","foxtrot","golf","hotel","india","juliet","kilo","lima","mango","ninja","omega","panda","quantum","rocket","samurai","tango","ultra","viking","whale","xray","yoga","zebra"];
+    function genStrong(){
+      const chars="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*()_+[]{}-=?";
+      const len=Math.max(policy.minLen, 14);
+      let out=''; for(let i=0;i<len;i++){out+=chars[randInt(chars.length)]}
+      return out;
+    }
+    function genPhrase(){
+      const words=[]; const n=Math.max(3, policy.passphrase?policy.minLen:4);
+      for(let i=0;i<n;i++){words.push(smallWords[randInt(smallWords.length)])}
+      const seps=['-','_','.','~'];
+      return words.join(seps[randInt(seps.length)]) + randInt(100);
+    }
+
+    // ====== Wiring ======
+    const pwdEl=document.getElementById('pwd');
+    const barEl=document.getElementById('bar');
+    const strengthEl=document.getElementById('strength');
+    const tipsEl=document.getElementById('tips');
+    const badgesEl=document.getElementById('badges');
+    const entropyEl=document.getElementById('entropy');
+    const crackEl=document.getElementById('crack');
+    const liveEl=document.getElementById('live');
+
+    async function evaluate(){
+      const pwd=pwdEl.value||''; if(!pwd){barEl.style.width='0%'; barEl.className='bar'; strengthEl.textContent='—'; tipsEl.innerHTML=''; badgesEl.innerHTML=''; entropyEl.textContent='0'; crackEl.textContent='—'; document.getElementById('explain').textContent=''; document.getElementById('hibpResult').textContent=''; return;}
+      const {score,pct,label,entropy,tips,badges,explain}=scorePassword(pwd);
+      barEl.style.width=pct+'%'; barEl.className='bar ' + (label==='Strong'?'strong':label==='Medium'?'med':'weak');
+      strengthEl.textContent = `${label} (${score}/100)`;
+      entropyEl.textContent = entropy;
+      crackEl.textContent = `offline≈${estimateCrackTime(entropy,'offline')} · online≈${estimateCrackTime(entropy,'online')}`;
+      tipsEl.innerHTML = '';
+      tips.forEach(t=>{const li=document.createElement('li'); li.textContent=t; tipsEl.appendChild(li);});
+      badgesEl.innerHTML=''; badges.forEach(b=>{const span=document.createElement('span'); span.className='badge'; span.textContent=b; badgesEl.appendChild(span)});
+      document.getElementById('explain').textContent = explain.join(' • ');
+      liveEl.textContent = `Strength ${label}`;
+
+      // Optional HIBP
+      const hibpOpt=document.getElementById('hibpOpt').checked;
+      const hibpDiv=document.getElementById('hibpResult');
+      if(hibpOpt){
+        hibpDiv.textContent='Checking breach status…';
+        const r=await hibpCheck(pwd);
+        if(r.ok){
+          if(r.count>0){hibpDiv.innerHTML=`⚠️ Found in breaches ${r.count.toLocaleString()} times. Avoid using this password.`}
+          else hibpDiv.textContent='✅ Not found in known breach corpus (still follow the other guidance).';
+        }else hibpDiv.textContent='(HIBP check failed; maybe offline or blocked)';
+      } else {hibpDiv.textContent='';}
+    }
+
+    pwdEl.addEventListener('input', evaluate);
+    ['piName','piEmail','piUser','piDob'].forEach(id=>document.getElementById(id).addEventListener('input', evaluate));
+
+    // Generators
+    const outEl=document.getElementById('genOut');
+    document.getElementById('genStrong').onclick=()=>{outEl.value=genStrong(); navigator.clipboard.writeText(outEl.value)};
+    document.getElementById('genPhrase').onclick=()=>{outEl.value=genPhrase(); navigator.clipboard.writeText(outEl.value)};
+    document.getElementById('copyBtn').onclick=()=>{if(outEl.value) navigator.clipboard.writeText(outEl.value)};
+
+    // Clipboard auto-clear
+    setInterval(async ()=>{
+      // naive clear by writing empty string
+      try{await navigator.clipboard.writeText('');}catch(e){}
+    }, 20000);
+  </script>
+</body>
+</html>
